@@ -39,12 +39,12 @@ int generate_keys(const char *output) {
     ed25519_create_seed(seed);
     ed25519_create_keypair(public_key, private_key, seed);
 
-    unsigned char public_key_path[PATH_SIZE];
+    char public_key_path[PATH_SIZE];
     if (snprintf(public_key_path, sizeof(public_key_path), "%s%s%s", PATH_PREFIX, output, ".pub") < 0) {
         k_error("Failed to create public key path");
         return 1;
     }
-    unsigned char private_key_path[PATH_SIZE];
+    char private_key_path[PATH_SIZE];
     if (snprintf(private_key_path, sizeof(private_key_path), "%s%s%s", PATH_PREFIX, output, ".priv") < 0) {
         k_error("Failed to create private key path");
         return 1;
@@ -141,9 +141,9 @@ int sign_kernel(const char *kernel_path, const char *public_key_path, const char
     free((void *) kernel_buffer);
 
     size_t public_key_size = 0;
-    const char *public_key_buffer = read_whole_file(public_key_path, &public_key_size);
+    const unsigned char *public_key_buffer = read_whole_file(public_key_path, &public_key_size);
     size_t private_key_size = 0;
-    const char *private_key_buffer = read_whole_file(private_key_path, &private_key_size);
+    const unsigned char *private_key_buffer = read_whole_file(private_key_path, &private_key_size);
 
     ed25519_sign(signature, kernel_hash, SHA256_DIGEST_LENGTH, public_key_buffer, private_key_buffer);
 
@@ -280,7 +280,7 @@ int read_kernel(const char *kernel_path, const char *public_key_path) { // NOLIN
             free((void *) kernel_buffer);
 
             size_t public_key_size = 0;
-            const char *public_key_buffer = read_whole_file(public_key_path, &public_key_size);
+            const unsigned char *public_key_buffer = read_whole_file(public_key_path, &public_key_size);
 
             verification_result =
                     ed25519_verify(kernel_footer.k_signature, kernel_hash, SHA256_DIGEST_LENGTH, public_key_buffer);

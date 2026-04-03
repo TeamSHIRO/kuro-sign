@@ -27,7 +27,7 @@ int write_file(const char *path, const unsigned char *data, size_t size) {
     return 0;
 }
 
-char *read_whole_file(const char *path, size_t *out_size) {
+unsigned char *read_whole_file(const char *path, size_t *out_size) {
     // 1. Open the file in binary mode ("rb") to prevent newline conversions
     FILE *f = fopen(path, "rb");
     if (!f) {
@@ -54,7 +54,7 @@ char *read_whole_file(const char *path, size_t *out_size) {
     }
 
     // 3. Allocate memory (+1 for null terminator if treating as a string)
-    char *buffer = malloc(fsize + 1);
+    unsigned char *buffer = malloc(fsize + 1);
     if (!buffer) {
         (void) fclose(f);
         return NULL;

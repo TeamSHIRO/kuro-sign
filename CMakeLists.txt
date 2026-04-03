@@ -17,26 +17,39 @@ project(KURO_SIGNER
 
 set(CMAKE_C_STANDARD 17)
 
+# ── Fetch ed25519 (orlp/ed25519) ───────────────────────────────────────────────
+include(FetchContent)
+FetchContent_Declare(
+        ed25519
+        GIT_REPOSITORY https://github.com/orlp/ed25519.git
+        GIT_TAG        master
+)
+FetchContent_MakeAvailable(ed25519)
+
+set(ED25519_SOURCES
+        ${ed25519_SOURCE_DIR}/src/add_scalar.c
+        ${ed25519_SOURCE_DIR}/src/fe.c
+        ${ed25519_SOURCE_DIR}/src/ge.c
+        ${ed25519_SOURCE_DIR}/src/sc.c
+        ${ed25519_SOURCE_DIR}/src/sha512.c
+        ${ed25519_SOURCE_DIR}/src/sign.c
+        ${ed25519_SOURCE_DIR}/src/verify.c
+        ${ed25519_SOURCE_DIR}/src/keypair.c
+        ${ed25519_SOURCE_DIR}/src/seed.c
+)
+
 set(KURO_SIGNER_SOURCES
         src/main.c
         src/file.c
         src/logger.c
-        _deps/ed25519/add_scalar.c
-        _deps/ed25519/fe.c
-        _deps/ed25519/ge.c
-        _deps/ed25519/sc.c
-        _deps/ed25519/sha512.c
-        _deps/ed25519/sign.c
-        _deps/ed25519/verify.c
-        _deps/ed25519/keypair.c
-        _deps/ed25519/seed.c
+        ${ED25519_SOURCES}
 )
 
 add_executable(kuro-sign
         ${KURO_SIGNER_SOURCES}
 )
 
-target_include_directories(kuro-sign PRIVATE _deps/ed25519)
+target_include_directories(kuro-sign PRIVATE ${ed25519_SOURCE_DIR}/src)
 
 find_package(OpenSSL REQUIRED)
 target_link_libraries(kuro-sign PRIVATE OpenSSL::Crypto)
