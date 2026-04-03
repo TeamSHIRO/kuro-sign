@@ -12,6 +12,19 @@
 - Simple CLI interface
 - Secure cryptographic operations (Ed25519, OpenSSL)
 
+## Installation
+
+> [!NOTE]
+> Currently, kuro-sign is only compatible with linux-based operating systems... You can help us extend compatibility by contributing to the project!
+
+Run this one-liner script to install kuro-sign on your system.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/TeamSHIRO/kuro-sign/main/install.sh | bash
+```
+
+Make sure you have all of the required dependencies, like Git and CMake!
+
 ## Usage
 
 ```
