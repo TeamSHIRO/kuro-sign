@@ -1,0 +1,11 @@
+# IDE specific files/folders
+.idea/
+.vscode/
+
+# Build directories
+build/
+cmake-build-*/
+
+# Preventing accidental commits of the generated or development files
+ignore_*
+ignore_*/
