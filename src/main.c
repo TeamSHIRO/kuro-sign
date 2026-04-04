@@ -345,7 +345,8 @@ void print_version() {
 }
 
 // NOLINTNEXTLINE
-int parse_args(int argc, char *argv[], char **output, char **public_key, char **private_key, int *no_sign) {
+int parse_args(int argc, char *argv[], char **output, char **public_key, char **private_key, int *no_sign,
+               int *show_version) {
     int opt;
     static struct option long_options[] = {
             {"output", required_argument, 0, 'o'},      {"public-key", required_argument, 0, 'k'},
@@ -367,8 +368,8 @@ int parse_args(int argc, char *argv[], char **output, char **public_key, char **
                 *no_sign = 1;
                 break;
             case 'v':
-                print_version();
-                return 0;
+                *show_version = 1;
+                break;
             case ':':
                 k_error("Error: Option -%c requires an argument", optopt);
                 return 1;
@@ -488,8 +489,16 @@ int main(int argc, char *argv[]) {
     char *public_key = NULL;
     char *private_key = NULL;
     int footer_only = 0;
+    int show_version = 0;
 
-    return parse_args(argc, argv, &output, &public_key, &private_key, &footer_only);
+    if (parse_args(argc, argv, &output, &public_key, &private_key, &footer_only, &show_version) != 0) {
+        return 1;
+    }
+
+    if (show_version) {
+        print_version();
+        return 0;
+    }
 
     if (optind < argc) {
         char *command = argv[optind];
