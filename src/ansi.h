@@ -7,6 +7,8 @@
 #define T_BLUE "\x1b[34m"
 #define T_MAGENTA "\x1b[35m"
 #define T_CYAN "\x1b[36m"
+#define T_WHITE "\x1b[37m"
+#define T_BLACK "\x1b[30m"
 
 #define B_RED "\x1b[41m"
 #define B_GREEN "\x1b[42m"
@@ -14,6 +16,8 @@
 #define B_BLUE "\x1b[44m"
 #define B_MAGENTA "\x1b[45m"
 #define B_CYAN "\x1b[46m"
+#define B_WHITE "\x1b[47m"
+#define B_BLACK "\x1b[40m"
 
 #define A_BOLD "\x1b[1m"
 #define A_DIM "\x1b[2m"

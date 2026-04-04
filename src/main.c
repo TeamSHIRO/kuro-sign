@@ -15,6 +15,7 @@
 
 #include "main.h"
 
+#include <curl/curl.h>
 #include <ed25519.h>
 #include <errno.h>
 #include <getopt.h>
@@ -92,18 +93,13 @@ int get_kuro_footer(const char *kernel_path, KuroFooter *footer) {
 }
 
 int sign_kernel(const char *kernel_path, const char *public_key_path, const char *private_key_path, // NOLINT
-                const char *output_path) {
-    if (public_key_path == NULL || private_key_path == NULL) {
+                const char *output_path, int footer_only) {
+    if (footer_only == 0 && (public_key_path == NULL || private_key_path == NULL)) {
         k_error("Public key and private key paths are required arguments!");
         printf(A_DIM "     > Tip! Retry again with `kuro-sign %s -p {public_key} -s {private_key}`\n" A_RESET,
                kernel_path);
         return 1;
     }
-
-    k_info("Signing kernel \"%s\" with public key \"%s\" and private key \"%s\"", kernel_path, public_key_path,
-           private_key_path);
-
-    unsigned char signature[SIGNATURE_SIZE];
     KuroFooter footer = {.k_identifier = {.k_magic0 = K_MAGIC0,
                                           .k_magic1 = K_MAGIC1,
                                           .k_magic2 = K_MAGIC2,
@@ -113,49 +109,61 @@ int sign_kernel(const char *kernel_path, const char *public_key_path, const char
                                           .k_reserved = 0},
                          .k_signature = ""};
 
-    size_t kernel_size = 0;
-    const char *kernel_buffer = read_whole_file(kernel_path, &kernel_size);
-    if (kernel_buffer == NULL) {
-        k_error("Failed to read kernel file \"%s\": %s (Error code: %d)", kernel_path, strerror(errno), errno);
-        return 1;
-    }
-    unsigned char kernel_hash[SHA256_DIGEST_LENGTH];
+    const unsigned char *public_key_buffer;
+    const unsigned char *private_key_buffer;
 
-    SHA256((unsigned char *) kernel_buffer, kernel_size, kernel_hash);
+    if (footer_only == 0) {
+        k_info("Signing kernel \"%s\" with public key \"%s\" and private key \"%s\"", kernel_path, public_key_path,
+               private_key_path);
 
-    if (output_path != NULL) {
-        FILE *copyptr;
-        copyptr = fopen(output_path, "wb");
-        size_t copy_size = fwrite(kernel_buffer, 1, kernel_size, copyptr);
-        if (copy_size != kernel_size) {
-            k_error("Failed to write kernel to \"%s\": %s (Error code: %d)", output_path, strerror(errno), errno);
-            (void) fclose(copyptr);
+        unsigned char signature[SIGNATURE_SIZE];
+        size_t kernel_size = 0;
+        const char *kernel_buffer = read_whole_file(kernel_path, &kernel_size);
+        if (kernel_buffer == NULL) {
+            k_error("Failed to read kernel file \"%s\": %s (Error code: %d)", kernel_path, strerror(errno), errno);
             return 1;
         }
-        if (fclose(copyptr) != 0) {
-            k_error("Failed to close kernel binary \"%s\": %s (Error code: %d)", output_path, strerror(errno), errno);
-            return 1;
+        unsigned char kernel_hash[SHA256_DIGEST_LENGTH];
+
+        SHA256((unsigned char *) kernel_buffer, kernel_size, kernel_hash);
+
+        if (output_path != NULL) {
+            FILE *copyptr;
+            copyptr = fopen(output_path, "wb");
+            size_t copy_size = fwrite(kernel_buffer, 1, kernel_size, copyptr);
+            if (copy_size != kernel_size) {
+                k_error("Failed to write kernel to \"%s\": %s (Error code: %d)", output_path, strerror(errno), errno);
+                (void) fclose(copyptr);
+                return 1;
+            }
+            if (fclose(copyptr) != 0) {
+                k_error("Failed to close kernel binary \"%s\": %s (Error code: %d)", output_path, strerror(errno),
+                        errno);
+                return 1;
+            }
         }
-    }
 
-    free((void *) kernel_buffer);
+        free((void *) kernel_buffer);
 
-    size_t public_key_size = 0;
-    const unsigned char *public_key_buffer = read_whole_file(public_key_path, &public_key_size);
-    size_t private_key_size = 0;
-    const unsigned char *private_key_buffer = read_whole_file(private_key_path, &private_key_size);
+        size_t public_key_size = 0;
+        public_key_buffer = (const unsigned char *) read_whole_file(public_key_path, &public_key_size);
+        size_t private_key_size = 0;
+        private_key_buffer = (const unsigned char *) read_whole_file(private_key_path, &private_key_size);
 
-    ed25519_sign(signature, kernel_hash, SHA256_DIGEST_LENGTH, public_key_buffer, private_key_buffer);
+        ed25519_sign(signature, kernel_hash, SHA256_DIGEST_LENGTH, public_key_buffer, private_key_buffer);
 
-    memcpy(footer.k_signature, signature, SIGNATURE_SIZE);
+        memcpy(footer.k_signature, signature, SIGNATURE_SIZE);
+        int verification_result = ed25519_verify(signature, kernel_hash, SHA256_DIGEST_LENGTH, public_key_buffer);
+        if (verification_result == 0) {
+            k_error("Signature verification failed.");
+            return 1;
+        } else { // NOLINT
+            k_success("Generated a valid signature for the kernel.");
+        }
+    } else {
+        const unsigned char EMPTY_SIGNATURE[SIGNATURE_SIZE] = {0};
 
-    int verification_result = ed25519_verify(signature, kernel_hash, SHA256_DIGEST_LENGTH, public_key_buffer);
-
-    if (verification_result == 0) {
-        k_error("Signature verification failed.");
-        return 1;
-    } else { // NOLINT
-        k_success("Generated a valid signature for the kernel.");
+        memcpy(footer.k_signature, EMPTY_SIGNATURE, SIGNATURE_SIZE);
     }
 
     KuroFooter kernel_footer;
@@ -199,15 +207,152 @@ int sign_kernel(const char *kernel_path, const char *public_key_path, const char
         return 1;
     }
 
-    free((void *) public_key_buffer);
-    free((void *) private_key_buffer);
+    if (footer_only == 0) {
+        free((void *) public_key_buffer);
+        free((void *) private_key_buffer);
+    }
 
     return 0;
 }
 
-int parse_args(int argc, char *argv[], char **output, char **public_key, char **private_key) { // NOLINT
+typedef struct {
+    char *data;
+    size_t size;
+} CurlBuffer;
+
+static size_t curl_write_cb(void *contents, size_t size, size_t nmemb, void *userp) {
+    size_t real_size = size * nmemb;
+    CurlBuffer *buf = (CurlBuffer *) userp;
+    char *ptr = realloc(buf->data, buf->size + real_size + 1);
+    if (ptr == NULL) {
+        return 0;
+    }
+    buf->data = ptr;
+    memcpy(&(buf->data[buf->size]), contents, real_size);
+    buf->size += real_size;
+    buf->data[buf->size] = '\0';
+    return real_size;
+}
+
+// NOLINTNEXTLINE
+static int gh_fetch_json(CurlBuffer *buf) {
+    CURL *curl = curl_easy_init();
+    if (curl == NULL) {
+        k_warn("Failed to initialize CURL for update check.");
+        return 1;
+    }
+
+    struct curl_slist *headers = NULL;
+    headers = curl_slist_append(headers, "User-Agent: kuro-sign/" PROJECT_VERSION);
+    headers = curl_slist_append(headers, "Accept: application/vnd.github+json");
+
+    curl_easy_setopt(curl, CURLOPT_URL, GITHUB_API_LATEST_RELEASE);
+    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, curl_write_cb);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, buf);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 5L);
+    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+
+    CURLcode res = curl_easy_perform(curl);
+    curl_slist_free_all(headers);
+    curl_easy_cleanup(curl);
+
+    if (res != CURLE_OK) {
+        k_warn("Update check failed: %s", curl_easy_strerror(res));
+        return 1;
+    }
+    return 0;
+}
+
+static int gh_parse_tag_version(const char *json, char *out, size_t max_len) {
+    const char *tag_key = "\"tag_name\":\"";
+    const char *pos = strstr(json, tag_key);
+    if (pos == NULL) {
+        return 1;
+    }
+    pos += strlen(tag_key);
+    if (*pos == 'v' || *pos == 'V') {
+        pos++;
+    }
+    size_t i = 0;
+    while (*pos != '\0' && *pos != '"' && i < max_len - 1) {
+        out[i++] = *pos++;
+    }
+    out[i] = '\0';
+    return 0;
+}
+
+static int semver_to_int(const char *version) {
+    char *p = (char *) version; // strtol won't modify the string; cast is safe
+    int maj = (int) strtol(p, &p, DECIMAL_BASE);
+    if (*p == '.') {
+        p++;
+    }
+    int min = (int) strtol(p, &p, DECIMAL_BASE);
+    if (*p == '.') {
+        p++;
+    }
+    int patch = (int) strtol(p, NULL, DECIMAL_BASE);
+    return (((maj * VERSION_SEMVER_SCALE) + min) * VERSION_SEMVER_SCALE) + patch;
+}
+
+void gh_get_latest_published_version(int *out_of_date, char **latest_ver) {
+    CurlBuffer buf = {.data = malloc(1), .size = 0};
+    if (buf.data == NULL) {
+        return;
+    }
+    buf.data[0] = '\0';
+
+    if (gh_fetch_json(&buf) != 0) {
+        free(buf.data);
+        return;
+    }
+
+    char latest[VERSION_BUFFER_SIZE];
+    if (gh_parse_tag_version(buf.data, latest, sizeof(latest)) != 0) {
+        k_warn("Failed to check for updates.");
+        free(buf.data);
+        return;
+    }
+
+    *latest_ver = latest;
+
+    free(buf.data);
+
+    if (semver_to_int(latest) > semver_to_int(PROJECT_VERSION)) {
+        *out_of_date = 1;
+    } else {
+        *out_of_date = 0;
+    }
+}
+
+void print_version() {
+    int out_of_date = 0;
+    char *latest = NULL;
+    gh_get_latest_published_version(&out_of_date, &latest);
+
+    printf("\n");
+    printf("🭌🬿🭠🭗  kuro-sign version " A_BOLD PROJECT_VERSION A_RESET "\n");
+    printf("██🭏🬼  ");
+
+    if (out_of_date) {
+        printf(T_YELLOW A_BOLD "⬤ new version available! (%s)" A_RESET "\n", latest);
+    } else {
+        printf(T_GREEN A_BOLD "⬤ up to date" A_RESET "\n");
+    }
+
+    printf("\n");
+}
+
+// NOLINTNEXTLINE
+int parse_args(int argc, char *argv[], char **output, char **public_key, char **private_key, int *no_sign) {
     int opt;
-    while ((opt = getopt(argc, argv, ":o:k:s:")) != -1) {
+    static struct option long_options[] = {
+            {"output", required_argument, 0, 'o'},      {"public-key", required_argument, 0, 'k'},
+            {"private-key", required_argument, 0, 's'}, {"footer-only", no_argument, 0, 'f'},
+            {"version", no_argument, 0, 'v'},           {0, 0, 0, 0}};
+    int option_index = 0;
+    while ((opt = getopt_long(argc, argv, ":o:k:s:fv", long_options, &option_index)) != -1) {
         switch (opt) { // NOLINT
             case 'o':
                 *output = optarg;
@@ -218,6 +363,12 @@ int parse_args(int argc, char *argv[], char **output, char **public_key, char **
             case 's':
                 *private_key = optarg;
                 break;
+            case 'f':
+                *no_sign = 1;
+                break;
+            case 'v':
+                print_version();
+                return 0;
             case ':':
                 k_error("Error: Option -%c requires an argument", optopt);
                 return 1;
@@ -227,11 +378,15 @@ int parse_args(int argc, char *argv[], char **output, char **public_key, char **
                 return 1;
         }
     }
+    return 0;
 }
 
 int read_kernel(const char *kernel_path, const char *public_key_path) { // NOLINT
     KuroFooter kernel_footer;
-    get_kuro_footer(kernel_path, &kernel_footer);
+    if (get_kuro_footer(kernel_path, &kernel_footer) != 0) {
+        k_error("Failed to read KURO footer from kernel file \"%s\"", kernel_path);
+        return 1;
+    }
 
     printf("KURO Footer:\n");
     printf("  Magic:              ");
@@ -258,7 +413,7 @@ int read_kernel(const char *kernel_path, const char *public_key_path) { // NOLIN
     printf("  Reserved:           %d\n", kernel_footer.k_identifier.k_reserved);
 
     printf("  Signature:          ");
-    int verification_result;
+    int verification_result = 0;
     for (int i = 0; i < SIGNATURE_SIZE; i++) {
         if (i > 0 && i % HEX_COLS == 0) {
             printf("\n                      ");
@@ -280,10 +435,11 @@ int read_kernel(const char *kernel_path, const char *public_key_path) { // NOLIN
             free((void *) kernel_buffer);
 
             size_t public_key_size = 0;
-            const unsigned char *public_key_buffer = read_whole_file(public_key_path, &public_key_size);
+            const unsigned char *public_key_buffer =
+                    (const unsigned char *) read_whole_file(public_key_path, &public_key_size);
 
-            verification_result =
-                    ed25519_verify(kernel_footer.k_signature, kernel_hash, SHA256_DIGEST_LENGTH, public_key_buffer);
+            verification_result = ed25519_verify((const unsigned char *) kernel_footer.k_signature, kernel_hash,
+                                                 SHA256_DIGEST_LENGTH, public_key_buffer);
 
             if (verification_result == 1) {
                 printf(T_GREEN A_BOLD "  ⬤ valid" A_RESET);
@@ -302,6 +458,8 @@ int read_kernel(const char *kernel_path, const char *public_key_path) { // NOLIN
     } else {
         printf(T_RED A_BOLD "✗ This kernel is not a valid KURO-compliant kernel. \n" A_RESET);
     }
+
+    return 0;
 }
 
 void print_usage() {
@@ -317,9 +475,11 @@ void print_usage() {
     printf("  read      Read and verify a kernel\n");
     printf("  help      Display this help message\n\n");
     printf(A_BOLD "Options:\n" A_RESET);
-    printf("  -o <file>    Specify the output file name\n");
-    printf("  -k <file>    Specify the public key file (required in the 'sign' command)\n");
-    printf("  -s <file>    Specify the private key file (required in the 'sign' command)\n");
+    printf("  -o --output      <file>    Specify the output file name\n");
+    printf("  -k --public-key  <file>    Specify the public key file (required in the 'sign' command)\n");
+    printf("  -s --private-key <file>    Specify the private key file (required in the 'sign' command)\n");
+    printf("  -f --footer-only           Generate only the footer without signing the kernel\n");
+    printf("  -v --version               Display the version information\n");
     printf("\n");
 }
 
@@ -327,8 +487,9 @@ int main(int argc, char *argv[]) {
     char *output = "kuro";
     char *public_key = NULL;
     char *private_key = NULL;
+    int footer_only = 0;
 
-    parse_args(argc, argv, &output, &public_key, &private_key);
+    return parse_args(argc, argv, &output, &public_key, &private_key, &footer_only);
 
     if (optind < argc) {
         char *command = argv[optind];
@@ -340,7 +501,7 @@ int main(int argc, char *argv[]) {
             if (kernel_path == NULL) {
                 k_error("Sign command requires a kernel path argument");
             } else {
-                sign_kernel(kernel_path, public_key, private_key, output);
+                sign_kernel(kernel_path, public_key, private_key, output, footer_only);
             }
         } else if (strcmp((const char *) command, "read") == 0) {
             if (kernel_path == NULL) {

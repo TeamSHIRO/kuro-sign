@@ -9,7 +9,7 @@
 cmake_minimum_required(VERSION 3.26 FATAL_ERROR)
 
 project(KURO_SIGNER
-        VERSION 0.1.0
+        VERSION 0.1.1
         DESCRIPTION "A signer for the KURO UEFI bootloader"
         HOMEPAGE_URL "https://oshub.org/projects/kuro"
         LANGUAGES C
@@ -50,6 +50,8 @@ add_executable(kuro-sign
 )
 
 target_include_directories(kuro-sign PRIVATE ${ed25519_SOURCE_DIR}/src)
+target_compile_definitions(kuro-sign PRIVATE PROJECT_VERSION="${CMAKE_PROJECT_VERSION}")
 
 find_package(OpenSSL REQUIRED)
-target_link_libraries(kuro-sign PRIVATE OpenSSL::Crypto)
+find_package(CURL REQUIRED)
+target_link_libraries(kuro-sign PRIVATE OpenSSL::Crypto CURL::libcurl)

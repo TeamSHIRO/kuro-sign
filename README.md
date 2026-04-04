@@ -41,11 +41,13 @@ kuro-sign {command} {kernel-path} [options]
 
 ### Attributes
 
-- `-o <file>`: Specify the output file path. This attribute can be used with the `keygen` and `sign` commands to define the location of the generated key pair or signed kernel image.
+- `-o --output <file>`: Specify the output file path. This attribute can be used with the `keygen` and `sign` commands to define the location of the generated key pair or signed kernel image.
 
-- `-k <public-key-path>`: Specify the path to the public key file. This attribute is used with the `sign` and `read` commands to provide the public key for signing or verification.
+- `-k --public-key <public-key-path>`: Specify the path to the public key file. This attribute is used with the `sign` and `read` commands to provide the public key for signing or verification.
 
-- `-s <private-key-path>`: Specify the path to the private key file. This attribute is used with the `sign` command to provide the private key for signing.
+- `-s --private-key <private-key-path>`: Specify the path to the private key file. This attribute is used with the `sign` command to provide the private key for signing.
+
+- `-f --footer-only`: Generate only the footer without signing the kernel.
 
 ## Quickstart
 

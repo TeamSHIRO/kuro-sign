@@ -3,8 +3,9 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include "ansi.h"
+
 void k_warn(const char *message, ...) {
-    printf(B_YELLOW A_BOLD WARNING_TEXT A_RESET " ");
+    printf(B_YELLOW A_BOLD T_BLACK WARNING_TEXT A_RESET " ");
     va_list args;
     va_start(args, message);
     vprintf(message, args);
@@ -13,7 +14,7 @@ void k_warn(const char *message, ...) {
 }
 
 void k_error(const char *message, ...) {
-    printf(B_RED A_BOLD ERROR_TEXT A_RESET " ");
+    printf(B_RED A_BOLD T_BLACK ERROR_TEXT A_RESET " ");
     va_list args;
     va_start(args, message);
     vprintf(message, args);
@@ -22,7 +23,7 @@ void k_error(const char *message, ...) {
 }
 
 void k_info(const char *message, ...) {
-    printf(B_BLUE A_BOLD INFO_TEXT A_RESET " ");
+    printf(B_BLUE A_BOLD T_BLACK INFO_TEXT A_RESET " ");
     va_list args;
     va_start(args, message);
     vprintf(message, args);
@@ -31,7 +32,7 @@ void k_info(const char *message, ...) {
 }
 
 void k_success(const char *message, ...) {
-    printf(B_GREEN A_BOLD SUCCESS_TEXT A_RESET " ");
+    printf(B_GREEN A_BOLD T_BLACK SUCCESS_TEXT A_RESET " ");
     va_list args;
     va_start(args, message);
     vprintf(message, args);

@@ -13,10 +13,11 @@
 #define PATH_PREFIX "./"
 #define HEX_COLS 5
 #define KURO_ASCII                                                                                                     \
-    "                            ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀\n                            "                                             \
-    "⠀⠀⠀⣄⠀⣤⡤⠀⠀⠀\n                            ⠀⠀⠀⣿⣷⣏⠀⠀⠀⠀\n                            ⠀⠀⠀⠛⠛⠛⠓⠀S⠀\n                   "  \
-    " "                                                                                                                \
-    "        ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀"
+    "                            ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀\n"                                                                         \
+    "                            ⠀⠀⠀⣄⠀⣤⡤⠀⠀⠀\n"                                                                         \
+    "                            ⠀⠀⠀⣿⣷⣏⠀⠀⠀⠀\n"                                                                         \
+    "                            ⠀⠀⠀⠛⠛⠛⠓⠀S⠀\n"                                                                         \
+    "                            ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀"
 
 #define K_MAGIC0 0x7F
 #define K_MAGIC1 0x4B // K
@@ -26,6 +27,13 @@
 
 #define MAGIC_SIZE 5
 #define K_CURRENT_VERSION 1
+
+#define GITHUB_REPO "TeamSHIRO/kuro-sign"
+#define GITHUB_API_LATEST_RELEASE "https://api.github.com/repos/" GITHUB_REPO "/releases/latest"
+
+#define VERSION_BUFFER_SIZE 32
+#define VERSION_SEMVER_SCALE 100
+#define DECIMAL_BASE 10
 
 typedef struct {
     uint8_t kernel_hash[SHA256_DIGEST_LENGTH]; // SHA-256
