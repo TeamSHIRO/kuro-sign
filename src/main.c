@@ -380,6 +380,7 @@ void print_usage() {
     printf("  -k --public-key  <file>    Specify the public key file (required in the 'sign' command)\n");
     printf("  -s --private-key <file>    Specify the private key file (required in the 'sign' command)\n");
     printf("  -f --footer-only           Generate only the footer without signing the kernel\n");
+    printf("  -V --version-override <n>  Override the KURO version (use with caution)\n");
     printf("  -v --version               Display the version information\n");
     printf("\n");
 }

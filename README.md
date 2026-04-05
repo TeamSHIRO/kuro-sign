@@ -47,6 +47,8 @@ kuro-sign {command} {kernel-path} [options]
 
 - `-f --footer-only`: Generate only the footer without signing the kernel.
 
+- `-V --version-override <version>`: Override the KURO version used in the footer. Use with caution as it may lead to incompatibility with certain bootloaders.
+
 - `-v --version`: Fetch the current version of kuro-sign and check for updates automatically.
 
 ## Quickstart
