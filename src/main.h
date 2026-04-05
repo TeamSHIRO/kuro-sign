@@ -12,12 +12,14 @@
 
 #define PATH_PREFIX "./"
 #define HEX_COLS 5
+// clang-format off
 #define KURO_ASCII                                                                                                     \
     "                            ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀\n"                                                                         \
     "                            ⠀⠀⠀⣄⠀⣤⡤⠀⠀⠀\n"                                                                         \
     "                            ⠀⠀⠀⣿⣷⣏⠀⠀⠀⠀\n"                                                                         \
     "                            ⠀⠀⠀⠛⠛⠛⠓⠀S⠀\n"                                                                         \
     "                            ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀"
+// clang-format on
 
 #define K_MAGIC0 0x7F
 #define K_MAGIC1 0x4B // K
