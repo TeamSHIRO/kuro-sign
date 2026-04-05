@@ -1,27 +1,27 @@
 name: Build
 
 on:
-  pull_request:
-  workflow_dispatch:
+    pull_request:
+    workflow_dispatch:
 
 permissions:
-  checks: write
-  contents: read
+    checks: write
+    contents: read
 
 jobs:
-  build:
-    name: Build
-    runs-on: ubuntu-latest
+    build:
+        name: Build
+        runs-on: ubuntu-latest
 
-    steps:
-      - name: Check out Git repository
-        uses: actions/checkout@v6
+        steps:
+            - name: Check out Git repository
+              uses: actions/checkout@v6
 
-      - name: Install build tools
-        uses: awalsh128/cache-apt-pkgs-action@latest
-        with:
-          packages: clang cmake ninja-build lld
+            - name: Install build tools
+              uses: awalsh128/cache-apt-pkgs-action@latest
+              with:
+                  packages: clang cmake ninja-build lld libssl-dev libcurl4-openssl-dev
 
-      - name: Build project
-        run: ./ci/build.sh
-        shell: bash
+            - name: Build project
+              run: ./ci/build.sh
+              shell: bash

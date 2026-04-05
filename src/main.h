@@ -26,7 +26,9 @@
 #define K_MAGIC4 0x4F // O
 
 #define MAGIC_SIZE 5
-#define K_CURRENT_VERSION 1
+#define K_VERSION_2 2
+#define K_VERSION_1 1
+#define K_VERSION_UNSUPPORTED 0
 
 typedef struct {
     uint8_t kernel_hash[SHA256_DIGEST_LENGTH]; // SHA-256
