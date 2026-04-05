@@ -28,13 +28,6 @@
 #define MAGIC_SIZE 5
 #define K_CURRENT_VERSION 1
 
-#define GITHUB_REPO "TeamSHIRO/kuro-sign"
-#define GITHUB_API_LATEST_RELEASE "https://api.github.com/repos/" GITHUB_REPO "/releases/latest"
-
-#define VERSION_BUFFER_SIZE 32
-#define VERSION_SEMVER_SCALE 100
-#define DECIMAL_BASE 10
-
 typedef struct {
     uint8_t kernel_hash[SHA256_DIGEST_LENGTH]; // SHA-256
     uint64_t kernel_size;

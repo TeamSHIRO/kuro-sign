@@ -42,6 +42,7 @@ set(KURO_SIGNER_SOURCES
         src/main.c
         src/file.c
         src/logger.c
+        src/gh.c
         ${ED25519_SOURCES}
 )
 
