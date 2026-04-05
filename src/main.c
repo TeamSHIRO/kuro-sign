@@ -94,19 +94,24 @@ int get_kuro_footer(const char *kernel_path, KuroFooter *footer) {
 }
 
 int sign_kernel(const char *kernel_path, const char *public_key_path, const char *private_key_path, // NOLINT
-                const char *output_path, int footer_only) {
+                const char *output_path, int footer_only, int version_override) { // NOLINT
     if (footer_only == 0 && (public_key_path == NULL || private_key_path == NULL)) {
         k_error("Public key and private key paths are required arguments!");
         printf(A_DIM "     > Tip! Retry again with `kuro-sign %s -p {public_key} -s {private_key}`\n" A_RESET,
                kernel_path);
         return 1;
     }
+
+    if (version_override != 0 && version_override < K_VERSION_2) {
+        k_warn("You're using a legacy or unsupported version of KURO! Things may break");
+    }
+
     KuroFooter footer = {.k_identifier = {.k_magic0 = K_MAGIC0,
                                           .k_magic1 = K_MAGIC1,
                                           .k_magic2 = K_MAGIC2,
                                           .k_magic3 = K_MAGIC3,
                                           .k_magic4 = K_MAGIC4,
-                                          .k_version = K_CURRENT_VERSION,
+                                          .k_version = version_override != 0 ? version_override : K_VERSION_2,
                                           .k_reserved = 0},
                          .k_signature = ""};
 
@@ -236,14 +241,14 @@ void print_version() {
 
 // NOLINTNEXTLINE
 int parse_args(int argc, char *argv[], char **output, char **public_key, char **private_key, int *no_sign,
-               int *show_version) {
+               int *show_version, int *version_override) {
     int opt;
     static struct option long_options[] = {
             {"output", required_argument, 0, 'o'},      {"public-key", required_argument, 0, 'k'},
             {"private-key", required_argument, 0, 's'}, {"footer-only", no_argument, 0, 'f'},
-            {"version", no_argument, 0, 'v'},           {0, 0, 0, 0}};
+            {"version", no_argument, 0, 'v'},           {"version-override", required_argument, 0, 'V'}};
     int option_index = 0;
-    while ((opt = getopt_long(argc, argv, ":o:k:s:fv", long_options, &option_index)) != -1) {
+    while ((opt = getopt_long(argc, argv, ":o:k:s:fvV:", long_options, &option_index)) != -1) {
         switch (opt) { // NOLINT
             case 'o':
                 *output = optarg;
@@ -260,12 +265,15 @@ int parse_args(int argc, char *argv[], char **output, char **public_key, char **
             case 'v':
                 *show_version = 1;
                 break;
+            case 'V':
+                *version_override = (int) strtol(optarg, NULL, DECIMAL_BASE);
+                break;
             case ':':
-                k_error("Error: Option -%c requires an argument", optopt);
+                k_error("Option -%c requires an argument", optopt);
                 return 1;
             case '?':
             default:
-                k_error("Error: Unknown option -%c", optopt);
+                k_error("Unknown option -%c", optopt);
                 return 1;
         }
     }
@@ -294,8 +302,10 @@ int read_kernel(const char *kernel_path, const char *public_key_path) { // NOLIN
     printf("\n");
 
     printf("  Version:            %d", kernel_footer.k_identifier.k_version);
-    if (kernel_footer.k_identifier.k_version == K_CURRENT_VERSION) {
+    if (kernel_footer.k_identifier.k_version == K_VERSION_2) {
         printf(T_GREEN A_BOLD "                ⬤ stable" A_RESET);
+    } else if (kernel_footer.k_identifier.k_version == K_VERSION_1) {
+        printf(T_YELLOW A_BOLD "                ⬤ legacy" A_RESET);
     } else {
         printf(T_RED A_BOLD "                ⬤ invalid" A_RESET);
     }
@@ -370,18 +380,22 @@ void print_usage() {
     printf("  -k --public-key  <file>    Specify the public key file (required in the 'sign' command)\n");
     printf("  -s --private-key <file>    Specify the private key file (required in the 'sign' command)\n");
     printf("  -f --footer-only           Generate only the footer without signing the kernel\n");
+    printf("  -V --version-override <n>  Override the KURO version (use with caution)\n");
     printf("  -v --version               Display the version information\n");
     printf("\n");
 }
 
+// NOLINTNEXTLINE
 int main(int argc, char *argv[]) {
     char *output = "kuro";
     char *public_key = NULL;
     char *private_key = NULL;
     int footer_only = 0;
     int show_version = 0;
+    int version_override = 0;
 
-    if (parse_args(argc, argv, &output, &public_key, &private_key, &footer_only, &show_version) != 0) {
+    if (parse_args(argc, argv, &output, &public_key, &private_key, &footer_only, &show_version, &version_override) !=
+        0) {
         return 1;
     }
 
@@ -400,13 +414,17 @@ int main(int argc, char *argv[]) {
             if (kernel_path == NULL) {
                 k_error("Sign command requires a kernel path argument");
             } else {
-                sign_kernel(kernel_path, public_key, private_key, output, footer_only);
+                if (sign_kernel(kernel_path, public_key, private_key, output, footer_only, version_override) != 0) {
+                    return 1;
+                }
             }
         } else if (strcmp((const char *) command, "read") == 0) {
             if (kernel_path == NULL) {
                 k_error("Read command requires a kernel path argument");
             } else {
-                read_kernel(kernel_path, public_key);
+                if (read_kernel(kernel_path, public_key) != 0) {
+                    return 1;
+                }
             }
         } else if (strcmp((const char *) command, "help") == 0) {
             print_usage();

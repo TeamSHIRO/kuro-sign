@@ -1,5 +1,3 @@
-![Help menu](./docs/res/help-menu.png)
-
 # kuro-sign
 
 **kuro-sign** is a minimal command-line tool for signing and verifying KURO-compliant UEFI kernels using the Ed25519 digital signature algorithm. More info on the KURO footer and signing in the [Official KURO Convention](https://github.com/TeamSHIRO/KURO/blob/main/docs/kuro_booting_convention.md)
@@ -48,6 +46,10 @@ kuro-sign {command} {kernel-path} [options]
 - `-s --private-key <private-key-path>`: Specify the path to the private key file. This attribute is used with the `sign` command to provide the private key for signing.
 
 - `-f --footer-only`: Generate only the footer without signing the kernel.
+
+- `-V --version-override <version>`: Override the KURO version used in the footer. Use with caution as it may lead to incompatibility with certain bootloaders.
+
+- `-v --version`: Fetch the current version of kuro-sign and check for updates automatically.
 
 ## Quickstart
 

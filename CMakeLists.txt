@@ -9,7 +9,7 @@
 cmake_minimum_required(VERSION 3.26 FATAL_ERROR)
 
 project(KURO_SIGNER
-        VERSION 0.1.1
+        VERSION 0.1.2
         DESCRIPTION "A signer for the KURO UEFI bootloader"
         HOMEPAGE_URL "https://oshub.org/projects/kuro"
         LANGUAGES C
