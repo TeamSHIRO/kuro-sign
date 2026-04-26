@@ -40,9 +40,16 @@ set(ED25519_SOURCES
 
 set(KURO_SIGNER_SOURCES
         src/main.c
+        src/main.h
         src/file.c
+        src/file.h
         src/logger.c
+        src/logger.h
         src/gh.c
+        src/gh.h
+        src/kuro.h
+        src/kuro_footer.h
+        src/ansi.h
         ${ED25519_SOURCES}
 )
 

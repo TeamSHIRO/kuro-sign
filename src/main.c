@@ -30,6 +30,8 @@
 #include "file.h"
 #include "gh.h"
 #include "logger.h"
+#include "kuro.h"
+#include "kuro_footer.h"
 
 int generate_keys(const char *output) {
     unsigned char seed[SEED_SIZE];
@@ -102,16 +104,12 @@ int sign_kernel(const char *kernel_path, const char *public_key_path, const char
         return 1;
     }
 
-    if (version_override != 0 && version_override < K_VERSION_2) {
+    if (version_override != 0 && version_override < KURO_VERSION_1) {
         k_warn("You're using a legacy or unsupported version of KURO! Things may break");
     }
 
-    KuroFooter footer = {.k_identifier = {.k_magic0 = K_MAGIC0,
-                                          .k_magic1 = K_MAGIC1,
-                                          .k_magic2 = K_MAGIC2,
-                                          .k_magic3 = K_MAGIC3,
-                                          .k_magic4 = K_MAGIC4,
-                                          .k_version = version_override != 0 ? version_override : K_VERSION_2,
+    KuroFooter footer = {.k_identifier = {.k_magic = KURO_MAGIC,
+                                          .k_version = version_override != 0 ? version_override : KURO_VERSION_1,
                                           .k_reserved = 0},
                          .k_signature = ""};
 
@@ -122,7 +120,7 @@ int sign_kernel(const char *kernel_path, const char *public_key_path, const char
         k_info("Signing kernel \"%s\" with public key \"%s\" and private key \"%s\"", kernel_path, public_key_path,
                private_key_path);
 
-        unsigned char signature[SIGNATURE_SIZE];
+        unsigned char signature[KURO_SIGNATURE_SIZE];
         size_t kernel_size = 0;
         const char *kernel_buffer = read_whole_file(kernel_path, &kernel_size);
         if (kernel_buffer == NULL) {
@@ -158,7 +156,7 @@ int sign_kernel(const char *kernel_path, const char *public_key_path, const char
 
         ed25519_sign(signature, kernel_hash, SHA256_DIGEST_LENGTH, public_key_buffer, private_key_buffer);
 
-        memcpy(footer.k_signature, signature, SIGNATURE_SIZE);
+        memcpy(footer.k_signature, signature, KURO_SIGNATURE_SIZE);
         int verification_result = ed25519_verify(signature, kernel_hash, SHA256_DIGEST_LENGTH, public_key_buffer);
         if (verification_result == 0) {
             k_error("Signature verification failed.");
@@ -167,17 +165,17 @@ int sign_kernel(const char *kernel_path, const char *public_key_path, const char
             k_success("Generated a valid signature for the kernel.");
         }
     } else {
-        const unsigned char EMPTY_SIGNATURE[SIGNATURE_SIZE] = {0};
+        const unsigned char EMPTY_SIGNATURE[KURO_SIGNATURE_SIZE] = {0};
 
-        memcpy(footer.k_signature, EMPTY_SIGNATURE, SIGNATURE_SIZE);
+        memcpy(footer.k_signature, EMPTY_SIGNATURE, KURO_SIGNATURE_SIZE);
     }
 
     KuroFooter kernel_footer;
     get_kuro_footer(kernel_path, &kernel_footer);
 
-    if (kernel_footer.k_identifier.k_magic0 != K_MAGIC0 || kernel_footer.k_identifier.k_magic1 != K_MAGIC1 ||
-        kernel_footer.k_identifier.k_magic2 != K_MAGIC2 || kernel_footer.k_identifier.k_magic3 != K_MAGIC3 ||
-        kernel_footer.k_identifier.k_magic4 != K_MAGIC4) {
+    const char K_MAGIC[KURO_MAGIC_LEN] = KURO_MAGIC;
+
+    if (memcmp(kernel_footer.k_identifier.k_magic, K_MAGIC, KURO_MAGIC_LEN) != 0) {
         FILE *fptr;
 
         if (output_path == NULL) {
@@ -282,6 +280,7 @@ int parse_args(int argc, char *argv[], char **output, char **public_key, char **
 
 int read_kernel(const char *kernel_path, const char *public_key_path) { // NOLINT
     KuroFooter kernel_footer;
+
     if (get_kuro_footer(kernel_path, &kernel_footer) != 0) {
         k_error("Failed to read KURO footer from kernel file \"%s\"", kernel_path);
         return 1;
@@ -289,12 +288,14 @@ int read_kernel(const char *kernel_path, const char *public_key_path) { // NOLIN
 
     printf("KURO Footer:\n");
     printf("  Magic:              ");
-    for (int i = 0; i < MAGIC_SIZE; i++) {
+    
+    for (int i = 0; i < KURO_MAGIC_LEN; i++) {
         printf("%02X ", ((uint8_t *) &kernel_footer.k_identifier)[i]);
     }
-    if (kernel_footer.k_identifier.k_magic0 == K_MAGIC0 && kernel_footer.k_identifier.k_magic1 == K_MAGIC1 &&
-        kernel_footer.k_identifier.k_magic2 == K_MAGIC2 && kernel_footer.k_identifier.k_magic3 == K_MAGIC3 &&
-        kernel_footer.k_identifier.k_magic4 == K_MAGIC4) {
+
+    const char K_MAGIC[KURO_MAGIC_LEN] = KURO_MAGIC;
+
+    if (memcmp(kernel_footer.k_identifier.k_magic, K_MAGIC, KURO_MAGIC_LEN) == 0) {
         printf(T_GREEN A_BOLD "  ⬤ valid" A_RESET);
     } else {
         printf(T_RED A_BOLD "  ⬤ invalid" A_RESET);
@@ -302,20 +303,18 @@ int read_kernel(const char *kernel_path, const char *public_key_path) { // NOLIN
     printf("\n");
 
     printf("  Version:            %d", kernel_footer.k_identifier.k_version);
-    if (kernel_footer.k_identifier.k_version == K_VERSION_2) {
+    if (kernel_footer.k_identifier.k_version == KURO_VERSION_1) {
         printf(T_GREEN A_BOLD "                ⬤ stable" A_RESET);
-    } else if (kernel_footer.k_identifier.k_version == K_VERSION_1) {
-        printf(T_YELLOW A_BOLD "                ⬤ legacy" A_RESET);
     } else {
         printf(T_RED A_BOLD "                ⬤ invalid" A_RESET);
     }
     printf("\n");
 
-    printf("  Reserved:           %d\n", kernel_footer.k_identifier.k_reserved);
+    printf("  Reserved:           %s\n", kernel_footer.k_identifier.k_reserved);
 
     printf("  Signature:          ");
     int verification_result = 0;
-    for (int i = 0; i < SIGNATURE_SIZE; i++) {
+    for (int i = 0; i < KURO_SIGNATURE_SIZE; i++) {
         if (i > 0 && i % HEX_COLS == 0) {
             printf("\n                      ");
         }
@@ -352,9 +351,7 @@ int read_kernel(const char *kernel_path, const char *public_key_path) { // NOLIN
     }
     printf("\n\n");
 
-    if (kernel_footer.k_identifier.k_magic0 == K_MAGIC0 && kernel_footer.k_identifier.k_magic1 == K_MAGIC1 &&
-        kernel_footer.k_identifier.k_magic2 == K_MAGIC2 && kernel_footer.k_identifier.k_magic3 == K_MAGIC3 &&
-        kernel_footer.k_identifier.k_magic4 == K_MAGIC4 && (public_key_path == NULL || verification_result == 1)) {
+    if (memcmp(kernel_footer.k_identifier.k_magic, K_MAGIC, KURO_MAGIC_LEN) == 0 && (public_key_path == NULL || verification_result == 1)) {
         printf(T_GREEN A_BOLD "✓ This kernel is a valid KURO-compliant kernel. \n" A_RESET);
     } else {
         printf(T_RED A_BOLD "✗ This kernel is not a valid KURO-compliant kernel. \n" A_RESET);
