@@ -17,7 +17,7 @@ You may obtain a copy of the source code at:
                  Third-Party Notices
 =====================================================
 
-The KURO bootloader uses ed25519 library made available by orlb,
+The KURO signer uses ed25519 library made available by orlb,
 provided under the Zlib license.
 
     Copyright (c) 2015 Orson Peters <orsonpeters@gmail.com>
