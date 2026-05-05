@@ -127,15 +127,26 @@ int sign_kernel(const char *kernel_path, const char *public_key_path, const char
             k_error("Failed to read kernel file \"%s\": %s (Error code: %d)", kernel_path, strerror(errno), errno);
             return 1;
         }
-        unsigned char kernel_hash[SHA256_DIGEST_LENGTH];
 
-        SHA256((unsigned char *) kernel_buffer, kernel_size, kernel_hash);
+        // Check if there's an existing footer and exclude it from hashing
+        KuroFooter existing_footer;
+        const char K_MAGIC[KURO_MAGIC_LEN] = KURO_MAGIC;
+        size_t effective_size = kernel_size;
+        if (kernel_size >= sizeof(KuroFooter)) {
+            memcpy(&existing_footer, kernel_buffer + kernel_size - sizeof(KuroFooter), sizeof(KuroFooter));
+            if (memcmp(existing_footer.k_identifier.k_magic, K_MAGIC, KURO_MAGIC_LEN) == 0) {
+                effective_size = kernel_size - sizeof(KuroFooter);
+            }
+        }
+
+        unsigned char kernel_hash[SHA256_DIGEST_LENGTH];
+        SHA256((unsigned char *) kernel_buffer, effective_size, kernel_hash);
 
         if (output_path != NULL) {
             FILE *copyptr;
             copyptr = fopen(output_path, "wb");
-            size_t copy_size = fwrite(kernel_buffer, 1, kernel_size, copyptr);
-            if (copy_size != kernel_size) {
+            size_t copy_size = fwrite(kernel_buffer, 1, effective_size, copyptr);
+            if (copy_size != effective_size) {
                 k_error("Failed to write kernel to \"%s\": %s (Error code: %d)", output_path, strerror(errno), errno);
                 (void) fclose(copyptr);
                 return 1;
@@ -166,7 +177,6 @@ int sign_kernel(const char *kernel_path, const char *public_key_path, const char
         }
     } else {
         const unsigned char EMPTY_SIGNATURE[KURO_SIGNATURE_SIZE] = {0};
-
         memcpy(footer.k_signature, EMPTY_SIGNATURE, KURO_SIGNATURE_SIZE);
     }
 
@@ -174,42 +184,53 @@ int sign_kernel(const char *kernel_path, const char *public_key_path, const char
     get_kuro_footer(kernel_path, &kernel_footer);
 
     const char K_MAGIC[KURO_MAGIC_LEN] = KURO_MAGIC;
+    const char *target_path = output_path != NULL ? output_path : kernel_path;
+    int has_existing_footer = memcmp(kernel_footer.k_identifier.k_magic, K_MAGIC, KURO_MAGIC_LEN) == 0;
 
-    if (memcmp(kernel_footer.k_identifier.k_magic, K_MAGIC, KURO_MAGIC_LEN) != 0) {
-        FILE *fptr;
+    if (has_existing_footer) {
+        k_warn("The kernel already has a KURO footer. Overwriting...");
 
-        if (output_path == NULL) {
-            fptr = fopen(kernel_path, "ab");
-        } else {
-            fptr = fopen(output_path, "ab");
-        }
+        FILE *fptr = fopen(target_path, "r+b");
         if (fptr == NULL) {
-            k_error("Failed to open kernel binary \"%s\" for writing: %s (Error code: %d)", kernel_path,
+            k_error("Failed to open kernel binary \"%s\" for writing: %s (Error code: %d)", target_path,
                     strerror(errno), errno);
             return 1;
         }
-
+        if (fseek(fptr, -(long) sizeof(KuroFooter), SEEK_END) != 0) {
+            k_error("Failed to seek in kernel binary \"%s\": %s (Error code: %d)", target_path, strerror(errno), errno);
+            (void) fclose(fptr);
+            return 1;
+        }
         if (fwrite(&footer, sizeof(KuroFooter), 1, fptr) != 1) {
-            k_error("Failed to write footer to kernel binary \"%s\": %s (Error code: %d)", kernel_path, strerror(errno),
+            k_error("Failed to overwrite footer in kernel binary \"%s\": %s (Error code: %d)", target_path,
+                    strerror(errno), errno);
+            (void) fclose(fptr);
+            return 1;
+        }
+        if (fclose(fptr) != 0) {
+            k_error("Failed to close kernel binary \"%s\": %s (Error code: %d)", target_path, strerror(errno), errno);
+            return 1;
+        }
+    } else {
+        FILE *fptr = fopen(target_path, "ab");
+        if (fptr == NULL) {
+            k_error("Failed to open kernel binary \"%s\" for writing: %s (Error code: %d)", target_path,
+                    strerror(errno), errno);
+            return 1;
+        }
+        if (fwrite(&footer, sizeof(KuroFooter), 1, fptr) != 1) {
+            k_error("Failed to write footer to kernel binary \"%s\": %s (Error code: %d)", target_path, strerror(errno),
                     errno);
             (void) fclose(fptr);
             return 1;
         }
-
         if (fclose(fptr) != 0) {
-            k_error("Failed to close kernel binary \"%s\": %s (Error code: %d)", kernel_path, strerror(errno), errno);
+            k_error("Failed to close kernel binary \"%s\": %s (Error code: %d)", target_path, strerror(errno), errno);
             return 1;
         }
-        if (output_path == NULL) {
-
-            k_success("KURO Footer appended to \"%s\"", kernel_path);
-        } else {
-            k_success("KURO Footer appended to \"%s\"", output_path);
-        }
-    } else {
-        k_warn("The kernel is already signed! No need to add a new footer.");
-        return 1;
     }
+
+    k_success("KURO Footer written to \"%s\"", target_path);
 
     if (footer_only == 0) {
         free((void *) public_key_buffer);
@@ -234,6 +255,7 @@ void print_version() {
         printf(T_GREEN A_BOLD "⬤ up to date" A_RESET "\n");
     }
 
+    free(latest);
     printf("\n");
 }
 

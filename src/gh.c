@@ -102,7 +102,11 @@ void gh_get_latest_published_version(int *out_of_date, char **latest_ver) {
         return;
     }
 
-    *latest_ver = latest;
+    size_t len = strlen(latest) + 1;
+    *latest_ver = malloc(len);
+    if (*latest_ver != NULL) {
+        memcpy(*latest_ver, latest, len);
+    }
 
     free(buf.data);
 
